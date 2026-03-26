@@ -1,8 +1,10 @@
 package io.github.bovinemagnet.antoraconfluence
 
 import io.github.bovinemagnet.antoraconfluence.extension.AntoraConfluenceExtension
+import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluenceFullPublishTask
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluencePlanTask
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluencePublishTask
+import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluenceReconcileStateTask
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluenceReportTask
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluenceValidateTask
 import org.gradle.api.Plugin
@@ -11,11 +13,16 @@ import org.gradle.api.Project
 /**
  * Gradle plugin that publishes Antora-structured AsciiDoc documentation to Atlassian Confluence.
  *
- * Registers the `antoraConfluence` extension and four lifecycle tasks:
- * - `antoraConfluenceValidate` – validates configuration and Antora content structure
- * - `antoraConfluencePlan`     – dry-run showing pages that would be created or updated
- * - `antoraConfluencePublish`  – publishes content to Confluence with incremental fingerprinting
- * - `antoraConfluenceReport`   – reports on the current publish state from the fingerprint store
+ * Registers the `antoraConfluence` extension and the following lifecycle tasks:
+ *
+ * | Task | Purpose |
+ * |------|---------|
+ * | `antoraConfluenceValidate`       | Validates config and Antora content structure |
+ * | `antoraConfluencePlan`           | Dry-run showing pages that would be created or updated |
+ * | `antoraConfluencePublish`        | Incremental publish (only changed pages) |
+ * | `antoraConfluenceFullPublish`    | Full publish (all pages regardless of fingerprint) |
+ * | `antoraConfluenceReconcileState` | Rebuilds local state from remote Confluence metadata |
+ * | `antoraConfluenceReport`         | Reports on current publish state |
  */
 class AntoraConfluencePlugin : Plugin<Project> {
 
@@ -25,75 +32,122 @@ class AntoraConfluencePlugin : Plugin<Project> {
             AntoraConfluenceExtension::class.java
         )
 
-        extension.contentDir.convention(project.layout.projectDirectory.dir("docs"))
-        extension.publishStrategy.convention(PublishStrategy.CREATE_AND_UPDATE)
-        extension.dryRun.convention(false)
+        // Apply defaults
+        extension.source.antoraRoot.convention(project.layout.projectDirectory.dir("docs"))
+        extension.publish.hierarchy.convention(HierarchyMode.COMPONENT_VERSION_MODULE_PAGE)
+        extension.publish.versionMode.convention(VersionMode.HIERARCHY)
+        extension.publish.createIndexPages.convention(false)
+        extension.publish.strict.convention(false)
+        extension.publish.orphanStrategy.convention(OrphanStrategy.REPORT)
+        extension.publish.publishStrategy.convention(PublishStrategy.CREATE_AND_UPDATE)
+        extension.publish.dryRun.convention(false)
+        extension.render.uploadImages.convention(true)
+        extension.render.normalizeWhitespaceForDiff.convention(true)
+        extension.render.failOnUnresolvedXref.convention(false)
+        extension.state.rebuildFromRemoteOnMissing.convention(true)
+        extension.state.file.convention(
+            project.layout.buildDirectory.file("antora-confluence/state.json")
+        )
+        extension.reports.jsonReportFile.convention(
+            project.layout.buildDirectory.file("antora-confluence/publish-report.json")
+        )
+        extension.reports.planReportFile.convention(
+            project.layout.buildDirectory.file("antora-confluence/plan-report.json")
+        )
 
+        // Register tasks (lazily)
         val validateTask = project.tasks.register(TASK_VALIDATE, AntoraConfluenceValidateTask::class.java)
         validateTask.configure {
             group = TASK_GROUP
             description = "Validates the Antora content structure and Confluence configuration."
-            contentDir.set(extension.contentDir)
-            confluenceUrl.set(extension.confluenceUrl)
-            spaceKey.set(extension.spaceKey)
+            contentDir.set(extension.source.antoraRoot)
+            confluenceUrl.set(extension.confluence.baseUrl)
+            spaceKey.set(extension.confluence.spaceKey)
         }
 
         val planTask = project.tasks.register(TASK_PLAN, AntoraConfluencePlanTask::class.java)
         planTask.configure {
             group = TASK_GROUP
             description = "Shows pages that would be created or updated without making changes."
-            contentDir.set(extension.contentDir)
-            confluenceUrl.set(extension.confluenceUrl)
-            username.set(extension.username)
-            apiToken.set(extension.apiToken)
-            spaceKey.set(extension.spaceKey)
-            parentPageTitle.set(extension.parentPageTitle)
-            fingerprintFile.set(
-                project.layout.buildDirectory.file("antora-confluence/fingerprints.json")
-            )
+            contentDir.set(extension.source.antoraRoot)
+            siteKey.set(extension.source.siteKey)
+            confluenceUrl.set(extension.confluence.baseUrl)
+            username.set(extension.confluence.username)
+            apiToken.set(extension.confluence.apiToken)
+            spaceKey.set(extension.confluence.spaceKey)
+            parentPageId.set(extension.confluence.parentPageId)
+            fingerprintFile.set(extension.state.file)
+            planReportFile.set(extension.reports.planReportFile)
             dependsOn(validateTask)
         }
 
         val publishTask = project.tasks.register(TASK_PUBLISH, AntoraConfluencePublishTask::class.java)
         publishTask.configure {
             group = TASK_GROUP
-            description = "Publishes Antora AsciiDoc content to Confluence."
-            contentDir.set(extension.contentDir)
-            confluenceUrl.set(extension.confluenceUrl)
-            username.set(extension.username)
-            apiToken.set(extension.apiToken)
-            spaceKey.set(extension.spaceKey)
-            parentPageTitle.set(extension.parentPageTitle)
-            publishStrategy.set(extension.publishStrategy)
-            dryRun.set(extension.dryRun)
-            fingerprintFile.set(
-                project.layout.buildDirectory.file("antora-confluence/fingerprints.json")
-            )
-            reportFile.set(
-                project.layout.buildDirectory.file("antora-confluence/publish-report.json")
-            )
+            description = "Publishes changed Antora AsciiDoc pages to Confluence (incremental)."
+            contentDir.set(extension.source.antoraRoot)
+            siteKey.set(extension.source.siteKey)
+            confluenceUrl.set(extension.confluence.baseUrl)
+            username.set(extension.confluence.username)
+            apiToken.set(extension.confluence.apiToken)
+            spaceKey.set(extension.confluence.spaceKey)
+            parentPageId.set(extension.confluence.parentPageId)
+            publishStrategy.set(extension.publish.publishStrategy)
+            orphanStrategy.set(extension.publish.orphanStrategy)
+            strict.set(extension.publish.strict)
+            applyLabels.set(extension.publish.applyLabels)
+            dryRun.set(extension.publish.dryRun)
+            fingerprintFile.set(extension.state.file)
+            reportFile.set(extension.reports.jsonReportFile)
             dependsOn(validateTask)
+        }
+
+        val fullPublishTask = project.tasks.register(TASK_FULL_PUBLISH, AntoraConfluenceFullPublishTask::class.java)
+        fullPublishTask.configure {
+            group = TASK_GROUP
+            description = "Republishes all Antora pages to Confluence regardless of content fingerprint."
+            contentDir.set(extension.source.antoraRoot)
+            siteKey.set(extension.source.siteKey)
+            confluenceUrl.set(extension.confluence.baseUrl)
+            username.set(extension.confluence.username)
+            apiToken.set(extension.confluence.apiToken)
+            spaceKey.set(extension.confluence.spaceKey)
+            parentPageId.set(extension.confluence.parentPageId)
+            strict.set(extension.publish.strict)
+            applyLabels.set(extension.publish.applyLabels)
+            dryRun.set(extension.publish.dryRun)
+            fingerprintFile.set(extension.state.file)
+            reportFile.set(extension.reports.jsonReportFile)
+            dependsOn(validateTask)
+        }
+
+        val reconcileTask = project.tasks.register(TASK_RECONCILE_STATE, AntoraConfluenceReconcileStateTask::class.java)
+        reconcileTask.configure {
+            group = TASK_GROUP
+            description = "Rebuilds the local state file from Confluence page properties metadata."
+            confluenceUrl.set(extension.confluence.baseUrl)
+            username.set(extension.confluence.username)
+            apiToken.set(extension.confluence.apiToken)
+            spaceKey.set(extension.confluence.spaceKey)
+            fingerprintFile.set(extension.state.file)
         }
 
         project.tasks.register(TASK_REPORT, AntoraConfluenceReportTask::class.java).configure {
             group = TASK_GROUP
             description = "Reports on the current Confluence publish state."
-            fingerprintFile.set(
-                project.layout.buildDirectory.file("antora-confluence/fingerprints.json")
-            )
-            reportFile.set(
-                project.layout.buildDirectory.file("antora-confluence/publish-report.json")
-            )
-            dependsOn(planTask)
+            fingerprintFile.set(extension.state.file)
+            reportFile.set(extension.reports.jsonReportFile)
         }
     }
 
     companion object {
         const val EXTENSION_NAME = "antoraConfluence"
-        const val TASK_GROUP = "Antora Confluence"
+        const val TASK_GROUP = "documentation"
         const val TASK_VALIDATE = "antoraConfluenceValidate"
         const val TASK_PLAN = "antoraConfluencePlan"
         const val TASK_PUBLISH = "antoraConfluencePublish"
+        const val TASK_FULL_PUBLISH = "antoraConfluenceFullPublish"
+        const val TASK_RECONCILE_STATE = "antoraConfluenceReconcileState"
         const val TASK_REPORT = "antoraConfluenceReport"
     }
 }

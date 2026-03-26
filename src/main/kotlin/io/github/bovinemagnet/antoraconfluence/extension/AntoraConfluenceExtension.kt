@@ -1,67 +1,73 @@
 package io.github.bovinemagnet.antoraconfluence.extension
 
-import io.github.bovinemagnet.antoraconfluence.PublishStrategy
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.provider.Property
+import org.gradle.api.Action
+import org.gradle.api.model.ObjectFactory
 import javax.inject.Inject
 
 /**
- * Configuration extension for the Antora Confluence plugin.
+ * Top-level extension for the Antora Confluence plugin.
  *
- * Example usage in `build.gradle.kts`:
+ * Configuration is organized into six nested blocks:
+ *
  * ```kotlin
  * antoraConfluence {
- *     confluenceUrl = "https://mycompany.atlassian.net/wiki"
- *     username = "user@example.com"
- *     apiToken = System.getenv("CONFLUENCE_API_TOKEN")
- *     spaceKey = "DOCS"
- *     parentPageTitle = "My Documentation"
- *     contentDir = layout.projectDirectory.dir("docs")
- *     publishStrategy = PublishStrategy.CREATE_AND_UPDATE
- *     dryRun = false
+ *     confluence {
+ *         baseUrl.set("https://mycompany.atlassian.net/wiki")
+ *         spaceKey.set("DOCS")
+ *         parentPageId.set("123456789")
+ *         username.set(providers.environmentVariable("CONFLUENCE_USER"))
+ *         apiToken.set(providers.environmentVariable("CONFLUENCE_TOKEN"))
+ *     }
+ *     source {
+ *         antoraRoot.set(layout.projectDirectory.dir("docs"))
+ *         siteKey.set("my-site")
+ *     }
+ *     publish {
+ *         hierarchy.set(HierarchyMode.COMPONENT_VERSION_MODULE_PAGE)
+ *         orphanStrategy.set(OrphanStrategy.REPORT)
+ *         dryRun.set(false)
+ *     }
+ *     render {
+ *         uploadImages.set(true)
+ *         normalizeWhitespaceForDiff.set(true)
+ *     }
+ *     state {
+ *         rebuildFromRemoteOnMissing.set(true)
+ *     }
+ *     reports {
+ *         jsonReportFile.set(layout.buildDirectory.file("reports/antora-confluence/publish.json"))
+ *     }
  * }
  * ```
  */
-abstract class AntoraConfluenceExtension @Inject constructor() {
+abstract class AntoraConfluenceExtension @Inject constructor(objects: ObjectFactory) {
 
-    /** Base URL of the Confluence instance (e.g. `https://mycompany.atlassian.net/wiki`). */
-    abstract val confluenceUrl: Property<String>
+    /** Confluence connection settings (URL, credentials, space, parent page). */
+    val confluence: ConfluenceSpec = objects.newInstance(ConfluenceSpec::class.java)
 
-    /** Confluence username (typically an email address for Confluence Cloud). */
-    abstract val username: Property<String>
+    /** Antora content source settings (root directory, site key). */
+    val source: SourceSpec = objects.newInstance(SourceSpec::class.java)
 
-    /**
-     * Confluence API token.
-     * For Confluence Cloud, generate a token at https://id.atlassian.com/manage/api-tokens.
-     * For Confluence Data Center, this is the user's password or a personal access token.
-     */
-    abstract val apiToken: Property<String>
+    /** Publish behavior settings (hierarchy, strategy, orphan handling, labels, dry-run). */
+    val publish: PublishSpec = objects.newInstance(PublishSpec::class.java)
 
-    /** Key of the Confluence space where pages will be published (e.g. `DOCS`). */
-    abstract val spaceKey: Property<String>
+    /** AsciiDoc rendering settings (xref handling, image upload, whitespace normalization). */
+    val render: RenderSpec = objects.newInstance(RenderSpec::class.java)
 
-    /**
-     * Title of the parent page under which all published pages will be organized.
-     * The parent page must already exist in the target space.
-     */
-    abstract val parentPageTitle: Property<String>
+    /** State file persistence settings. */
+    val state: StateSpec = objects.newInstance(StateSpec::class.java)
 
-    /**
-     * Root directory of the Antora content source tree.
-     * Defaults to `<projectDir>/docs`.
-     */
-    abstract val contentDir: DirectoryProperty
+    /** Report file path settings. */
+    val reports: ReportsSpec = objects.newInstance(ReportsSpec::class.java)
 
-    /**
-     * Controls how pages are managed during publish.
-     * Defaults to [PublishStrategy.CREATE_AND_UPDATE].
-     */
-    abstract val publishStrategy: Property<PublishStrategy>
+    // -------------------------------------------------------------------------
+    // DSL convenience methods for nested block configuration
+    // -------------------------------------------------------------------------
 
-    /**
-     * When `true`, no changes are written to Confluence.
-     * The plugin will report what *would* happen without making any API calls that mutate state.
-     * Defaults to `false`.
-     */
-    abstract val dryRun: Property<Boolean>
+    fun confluence(action: Action<ConfluenceSpec>) = action.execute(confluence)
+    fun source(action: Action<SourceSpec>) = action.execute(source)
+    fun publish(action: Action<PublishSpec>) = action.execute(publish)
+    fun render(action: Action<RenderSpec>) = action.execute(render)
+    fun state(action: Action<StateSpec>) = action.execute(state)
+    fun reports(action: Action<ReportsSpec>) = action.execute(reports)
 }

@@ -9,9 +9,6 @@ import java.io.File
 
 /**
  * Functional tests for [AntoraConfluencePlugin] using Gradle TestKit.
- *
- * These tests verify that the plugin applies cleanly, registers the expected tasks and extension,
- * and that the validate task behaves correctly with a valid Antora content tree.
  */
 class AntoraConfluencePluginTest {
 
@@ -33,11 +30,11 @@ class AntoraConfluencePluginTest {
             }
         """)
         val result = runner("tasks").build()
-        assertThat(result.output).contains("Antora Confluence")
+        assertThat(result.output).containsIgnoringCase("documentation")
     }
 
     @Test
-    fun `plugin registers all four tasks`() {
+    fun `plugin registers all six tasks`() {
         writeBuildFile("""
             plugins {
                 id("io.github.bovinemagnet.antora-confluence")
@@ -48,6 +45,8 @@ class AntoraConfluencePluginTest {
             .contains("antoraConfluenceValidate")
             .contains("antoraConfluencePlan")
             .contains("antoraConfluencePublish")
+            .contains("antoraConfluenceFullPublish")
+            .contains("antoraConfluenceReconcileState")
             .contains("antoraConfluenceReport")
     }
 
@@ -68,6 +67,78 @@ class AntoraConfluencePluginTest {
         assertThat(result.output).contains("extension ok")
     }
 
+    @Test
+    fun `plugin tasks appear in documentation group`() {
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+        """)
+        val result = runner("tasks").build()
+        assertThat(result.output).containsIgnoringCase("documentation")
+    }
+
+    // -------------------------------------------------------------------------
+    // Nested extension DSL
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `nested confluence block is accessible`() {
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            antoraConfluence {
+                confluence {
+                    baseUrl.set("https://example.atlassian.net/wiki")
+                    spaceKey.set("DOCS")
+                }
+                source {
+                    siteKey.set("my-site")
+                }
+            }
+            tasks.register("checkNestedDsl") {
+                doLast {
+                    val ext = project.extensions.getByType(
+                        io.github.bovinemagnet.antoraconfluence.extension.AntoraConfluenceExtension::class.java
+                    )
+                    println("url=" + ext.confluence.baseUrl.get())
+                    println("site=" + ext.source.siteKey.get())
+                }
+            }
+        """)
+        val result = runner("checkNestedDsl").build()
+        assertThat(result.output)
+            .contains("url=https://example.atlassian.net/wiki")
+            .contains("site=my-site")
+    }
+
+    @Test
+    fun `publish block defaults are applied`() {
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            tasks.register("checkDefaults") {
+                doLast {
+                    val ext = project.extensions.getByType(
+                        io.github.bovinemagnet.antoraconfluence.extension.AntoraConfluenceExtension::class.java
+                    )
+                    println("dryRun=" + ext.publish.dryRun.get())
+                    println("strict=" + ext.publish.strict.get())
+                    println("hierarchy=" + ext.publish.hierarchy.get())
+                    println("orphan=" + ext.publish.orphanStrategy.get())
+                }
+            }
+        """)
+        val result = runner("checkDefaults").build()
+        assertThat(result.output)
+            .contains("dryRun=false")
+            .contains("strict=false")
+            .contains("hierarchy=COMPONENT_VERSION_MODULE_PAGE")
+            .contains("orphan=REPORT")
+    }
+
     // -------------------------------------------------------------------------
     // antoraConfluenceValidate task
     // -------------------------------------------------------------------------
@@ -80,7 +151,9 @@ class AntoraConfluencePluginTest {
                 id("io.github.bovinemagnet.antora-confluence")
             }
             antoraConfluence {
-                contentDir = layout.projectDirectory.dir("docs")
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                }
             }
         """)
         val result = runner("antoraConfluenceValidate").build()
@@ -95,7 +168,9 @@ class AntoraConfluencePluginTest {
                 id("io.github.bovinemagnet.antora-confluence")
             }
             antoraConfluence {
-                contentDir = layout.projectDirectory.dir("docs")
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                }
             }
         """)
         val result = runner("antoraConfluenceValidate").buildAndFail()
@@ -110,7 +185,9 @@ class AntoraConfluencePluginTest {
                 id("io.github.bovinemagnet.antora-confluence")
             }
             antoraConfluence {
-                contentDir = layout.projectDirectory.dir("docs")
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                }
             }
         """)
         val result = runner("antoraConfluenceValidate").buildAndFail()
@@ -118,19 +195,21 @@ class AntoraConfluencePluginTest {
     }
 
     @Test
-    fun `validate task emits warning when confluenceUrl is not set`() {
+    fun `validate task emits warning when baseUrl is not set`() {
         createValidAntoraContent()
         writeBuildFile("""
             plugins {
                 id("io.github.bovinemagnet.antora-confluence")
             }
             antoraConfluence {
-                contentDir = layout.projectDirectory.dir("docs")
-                // confluenceUrl intentionally omitted
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                    // confluence.baseUrl intentionally omitted
+                }
             }
         """)
         val result = runner("antoraConfluenceValidate").build()
-        assertThat(result.output).contains("confluenceUrl")
+        assertThat(result.output).contains("baseUrl")
     }
 
     // -------------------------------------------------------------------------
@@ -145,12 +224,34 @@ class AntoraConfluencePluginTest {
                 id("io.github.bovinemagnet.antora-confluence")
             }
             antoraConfluence {
-                contentDir = layout.projectDirectory.dir("docs")
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                    siteKey.set("my-site")
+                }
             }
         """)
         val result = runner("antoraConfluencePlan").build()
         assertThat(result.task(":antoraConfluencePlan")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
         assertThat(result.output).containsAnyOf("CREATE", "Plan summary")
+    }
+
+    @Test
+    fun `plan task page ids include siteKey`() {
+        createValidAntoraContent()
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            antoraConfluence {
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                    siteKey.set("acme-docs")
+                }
+            }
+        """)
+        val result = runner("antoraConfluencePlan").build()
+        // page IDs in plan output should be prefixed with siteKey
+        assertThat(result.output).contains("acme-docs/")
     }
 
     // -------------------------------------------------------------------------

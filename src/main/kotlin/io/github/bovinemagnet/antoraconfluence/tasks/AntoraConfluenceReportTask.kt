@@ -9,8 +9,8 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 
 /**
- * Reports on the current Confluence publish state by reading the fingerprint store and the
- * latest publish report produced by [AntoraConfluencePublishTask].
+ * Reports on the current Confluence publish state by reading the local fingerprint store and
+ * the latest publish report produced by [AntoraConfluencePublishTask].
  *
  * This task is read-only and makes no API calls or filesystem writes.
  */
@@ -36,7 +36,7 @@ abstract class AntoraConfluenceReportTask : DefaultTask() {
     private fun reportFingerprintStore() {
         val storeFileRef = fingerprintFile.asFile.orNull
         if (storeFileRef == null || !storeFileRef.exists()) {
-            logger.lifecycle("No fingerprint store found. Run antoraConfluencePublish to populate it.")
+            logger.lifecycle("No state file found. Run antoraConfluencePublish to populate it.")
             return
         }
 
@@ -44,8 +44,8 @@ abstract class AntoraConfluenceReportTask : DefaultTask() {
         val entries: Collection<FingerprintEntry> = store.allEntries()
 
         logger.lifecycle("")
-        logger.lifecycle("Fingerprint store: ${storeFileRef.absolutePath}")
-        logger.lifecycle("Tracked pages    : ${entries.size}")
+        logger.lifecycle("State file   : ${storeFileRef.absolutePath}")
+        logger.lifecycle("Tracked pages: ${entries.size}")
 
         if (entries.isEmpty()) {
             logger.lifecycle("(no pages tracked yet)")

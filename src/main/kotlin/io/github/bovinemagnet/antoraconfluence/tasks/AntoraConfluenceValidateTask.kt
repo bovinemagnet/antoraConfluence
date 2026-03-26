@@ -49,14 +49,17 @@ abstract class AntoraConfluenceValidateTask : DefaultTask() {
         }
 
         val pages = scanner.scan(contentDirFile)
-        logger.lifecycle("Found ${pages.size} Antora page(s) across ${pages.map { it.componentName }.distinct().size} component(s).")
+        logger.lifecycle(
+            "Found ${pages.size} Antora page(s) across " +
+                "${pages.map { it.componentName }.distinct().size} component(s)."
+        )
 
         // 2. Warn about missing Confluence settings (not fatal – may be provided at runtime)
         if (!confluenceUrl.isPresent || confluenceUrl.get().isBlank()) {
-            logger.warn("antoraConfluence.confluenceUrl is not set. Tasks that call Confluence will fail.")
+            logger.warn("antoraConfluence.confluence.baseUrl is not set. Tasks that call Confluence will fail.")
         }
         if (!spaceKey.isPresent || spaceKey.get().isBlank()) {
-            logger.warn("antoraConfluence.spaceKey is not set. Tasks that call Confluence will fail.")
+            logger.warn("antoraConfluence.confluence.spaceKey is not set. Tasks that call Confluence will fail.")
         }
 
         logger.lifecycle("Validation passed.")

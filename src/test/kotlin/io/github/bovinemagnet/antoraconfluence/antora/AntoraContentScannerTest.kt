@@ -49,7 +49,7 @@ class AntoraContentScannerTest {
     }
 
     // -------------------------------------------------------------------------
-    // scan()
+    // scan() — without siteKey
     // -------------------------------------------------------------------------
 
     @Test
@@ -98,19 +98,37 @@ class AntoraContentScannerTest {
         assertThat(pages).hasSize(1)
     }
 
+    // -------------------------------------------------------------------------
+    // scan() — page identity with siteKey
+    // -------------------------------------------------------------------------
+
     @Test
-    fun `scan populates correct pageId`() {
+    fun `scan populates correct pageId with siteKey and version`() {
         createValidAntoraComponent(tempDir, "my-docs", "ROOT", listOf("getting-started.adoc"), version = "1.0")
-        val pages = scanner.scan(tempDir)
+        val pages = scanner.scan(tempDir, siteKey = "acme-site")
         assertThat(pages).hasSize(1)
-        assertThat(pages[0].pageId).isEqualTo("my-docs/1.0/ROOT/getting-started")
+        assertThat(pages[0].pageId).isEqualTo("acme-site/my-docs/1.0/ROOT/getting-started")
     }
 
     @Test
     fun `scan pageId omits version when blank`() {
         createValidAntoraComponent(tempDir, "my-docs", "ROOT", listOf("index.adoc"), version = "")
-        val pages = scanner.scan(tempDir)
-        assertThat(pages[0].pageId).isEqualTo("my-docs/ROOT/index")
+        val pages = scanner.scan(tempDir, siteKey = "my-site")
+        assertThat(pages[0].pageId).isEqualTo("my-site/my-docs/ROOT/index")
+    }
+
+    @Test
+    fun `scan pageId omits siteKey when blank`() {
+        createValidAntoraComponent(tempDir, "my-docs", "ROOT", listOf("index.adoc"), version = "1.0")
+        val pages = scanner.scan(tempDir, siteKey = "")
+        assertThat(pages[0].pageId).isEqualTo("my-docs/1.0/ROOT/index")
+    }
+
+    @Test
+    fun `scan siteKey is stored on AntoraPage`() {
+        createValidAntoraComponent(tempDir, "my-docs", "ROOT", listOf("index.adoc"))
+        val pages = scanner.scan(tempDir, siteKey = "test-site")
+        assertThat(pages[0].siteKey).isEqualTo("test-site")
     }
 
     @Test

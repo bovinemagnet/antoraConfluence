@@ -5,13 +5,15 @@ import java.io.File
 /**
  * Represents a single AsciiDoc page discovered inside an Antora content tree.
  *
- * @property componentName  Value of the `name` field in the nearest `antora.yml`.
+ * @property siteKey          Optional site-level identifier that namespaces the canonical page key.
+ * @property componentName    Value of the `name` field in the nearest `antora.yml`.
  * @property componentVersion Value of the `version` field in the nearest `antora.yml` (may be empty).
- * @property moduleName     Name of the Antora module (folder under `modules/`).
- * @property relativePath   Path of the `.adoc` file relative to the module's `pages/` directory.
- * @property sourceFile     Absolute file reference to the `.adoc` source.
+ * @property moduleName       Name of the Antora module (folder under `modules/`).
+ * @property relativePath     Path of the `.adoc` file relative to the module's `pages/` directory.
+ * @property sourceFile       Absolute file reference to the `.adoc` source.
  */
 data class AntoraPage(
+    val siteKey: String,
     val componentName: String,
     val componentVersion: String,
     val moduleName: String,
@@ -19,12 +21,20 @@ data class AntoraPage(
     val sourceFile: File
 ) {
     /**
-     * A stable, human-readable identifier that uniquely identifies this page within a
-     * Confluence space.  It is used as the Confluence page title and as the key in the
-     * [io.github.bovinemagnet.antoraconfluence.fingerprint.ContentFingerprintStore].
+     * Stable canonical identity key for this page.
+     *
+     * Format: `<siteKey>/<component>/<version>/<module>/<path-without-extension>`
+     *
+     * The `siteKey` segment is omitted when blank.  This key is used:
+     * - as the key in [io.github.bovinemagnet.antoraconfluence.fingerprint.ContentFingerprintStore]
+     * - as the identity stored in Confluence page properties
      */
     val pageId: String
         get() = buildString {
+            if (siteKey.isNotBlank()) {
+                append(siteKey)
+                append("/")
+            }
             append(componentName)
             if (componentVersion.isNotBlank()) {
                 append("/")
@@ -71,16 +81,17 @@ class AntoraContentScanner {
      * Scans [contentDir] recursively for all Antora components and their pages.
      *
      * @param contentDir Root of the Antora content source tree.
+     * @param siteKey    Optional site-level identifier prepended to each page's canonical key.
      * @return List of [AntoraPage] instances, one per `.adoc` file found.
      * @throws AntoraStructureException if [contentDir] does not exist or is not a directory.
      */
-    fun scan(contentDir: File): List<AntoraPage> {
+    fun scan(contentDir: File, siteKey: String = ""): List<AntoraPage> {
         require(contentDir.exists()) { "Content directory does not exist: ${contentDir.absolutePath}" }
         require(contentDir.isDirectory) { "Content path is not a directory: ${contentDir.absolutePath}" }
 
         return findAntoraYmlFiles(contentDir).flatMap { antoraYml ->
             val descriptor = parseAntoraYml(antoraYml)
-            scanComponent(antoraYml.parentFile, descriptor)
+            scanComponent(antoraYml.parentFile, descriptor, siteKey)
         }
     }
 
@@ -141,7 +152,11 @@ class AntoraContentScanner {
         return AntoraComponentDescriptor(name = name, version = version, title = title)
     }
 
-    private fun scanComponent(componentDir: File, descriptor: AntoraComponentDescriptor): List<AntoraPage> {
+    private fun scanComponent(
+        componentDir: File,
+        descriptor: AntoraComponentDescriptor,
+        siteKey: String
+    ): List<AntoraPage> {
         val modulesDir = File(componentDir, "modules")
         if (!modulesDir.isDirectory) return emptyList()
 
@@ -150,7 +165,7 @@ class AntoraContentScanner {
             .flatMap { moduleDir ->
                 val pagesDir = File(moduleDir, "pages")
                 if (!pagesDir.isDirectory) return@flatMap emptyList()
-                scanPages(pagesDir, descriptor, moduleDir.name, pagesDir)
+                scanPages(pagesDir, descriptor, moduleDir.name, pagesDir, siteKey)
             }
     }
 
@@ -158,12 +173,14 @@ class AntoraContentScanner {
         pagesDir: File,
         descriptor: AntoraComponentDescriptor,
         moduleName: String,
-        baseDir: File
+        baseDir: File,
+        siteKey: String
     ): List<AntoraPage> =
         pagesDir.walkTopDown()
             .filter { it.isFile && it.extension == "adoc" }
             .map { adocFile ->
                 AntoraPage(
+                    siteKey = siteKey,
                     componentName = descriptor.name,
                     componentVersion = descriptor.version,
                     moduleName = moduleName,
