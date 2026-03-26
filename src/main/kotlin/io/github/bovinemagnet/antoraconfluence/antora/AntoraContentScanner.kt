@@ -11,6 +11,11 @@ import java.io.File
  * @property moduleName       Name of the Antora module (folder under `modules/`).
  * @property relativePath     Path of the `.adoc` file relative to the module's `pages/` directory.
  * @property sourceFile       Absolute file reference to the `.adoc` source.
+ * @property title            Document title parsed from the AsciiDoc `= Title` heading; falls back
+ *                            to [suggestedTitle] when blank.
+ * @property images           Image targets extracted from block and inline image macros.
+ * @property includes         Targets of all `include::` directives found in the source.
+ * @property xrefs            Targets of all `xref:` macros found in the source.
  */
 data class AntoraPage(
     val siteKey: String,
@@ -18,7 +23,11 @@ data class AntoraPage(
     val componentVersion: String,
     val moduleName: String,
     val relativePath: String,
-    val sourceFile: File
+    val sourceFile: File,
+    val title: String = "",
+    val images: List<String> = emptyList(),
+    val includes: List<String> = emptyList(),
+    val xrefs: List<String> = emptyList()
 ) {
     /**
      * Stable canonical identity key for this page.
@@ -46,11 +55,18 @@ data class AntoraPage(
             append(relativePath.removeSuffix(".adoc"))
         }
 
-    /** Suggested Confluence page title derived from the AsciiDoc file name. */
+    /**
+     * Suggested Confluence page title.
+     *
+     * When [title] is non-blank it is used as the base; otherwise the AsciiDoc filename is
+     * used. In both cases hyphens and underscores are replaced with spaces and each word is
+     * title-cased, so that raw filenames and plain document titles are both normalised into a
+     * human-readable form suitable for a Confluence page title.
+     */
     val suggestedTitle: String
         get() {
-            val baseName = sourceFile.nameWithoutExtension
-            return baseName
+            val base = if (title.isNotBlank()) title else sourceFile.nameWithoutExtension
+            return base
                 .replace('-', ' ')
                 .replace('_', ' ')
                 .split(' ')
@@ -77,6 +93,8 @@ data class AntoraPage(
  */
 class AntoraContentScanner {
 
+    private val referenceExtractor = AsciiDocReferenceExtractor()
+
     /**
      * Scans [contentDir] recursively for all Antora components and their pages.
      *
@@ -93,6 +111,20 @@ class AntoraContentScanner {
             val descriptor = parseAntoraYml(antoraYml)
             scanComponent(antoraYml.parentFile, descriptor, siteKey)
         }
+    }
+
+    /**
+     * Performs a full scan of [contentDir], returning both the list of pages (with extracted
+     * references) and a manifest of all images discovered in `images/` directories.
+     *
+     * @param contentDir Root of the Antora content source tree.
+     * @param siteKey    Optional site-level identifier prepended to each page's canonical key.
+     * @return [AntoraContentModel] containing pages and image manifest.
+     */
+    fun scanFull(contentDir: File, siteKey: String = ""): AntoraContentModel {
+        val pages = scan(contentDir, siteKey)
+        val imageManifest = discoverImages(contentDir)
+        return AntoraContentModel(pages, imageManifest)
     }
 
     /**
@@ -135,17 +167,14 @@ class AntoraContentScanner {
             .toList()
 
     internal fun parseAntoraYml(antoraYml: File): AntoraComponentDescriptor {
-        val lines = antoraYml.readLines()
-        var name = ""
-        var version = ""
-        var title = ""
-        for (line in lines) {
-            when {
-                line.startsWith("name:") -> name = line.removePrefix("name:").trim().removeSurrounding("'").removeSurrounding("\"")
-                line.startsWith("version:") -> version = line.removePrefix("version:").trim().removeSurrounding("'").removeSurrounding("\"")
-                line.startsWith("title:") -> title = line.removePrefix("title:").trim().removeSurrounding("'").removeSurrounding("\"")
-            }
-        }
+        val mapper = com.fasterxml.jackson.dataformat.yaml.YAMLMapper()
+        val tree: Map<String, Any?> = mapper.readValue(
+            antoraYml,
+            object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {}
+        )
+        val name = tree["name"]?.toString()?.trim() ?: ""
+        val version = tree["version"]?.toString()?.trim() ?: ""
+        val title = tree["title"]?.toString()?.trim() ?: ""
         if (name.isBlank()) {
             throw AntoraStructureException("Missing 'name' field in ${antoraYml.absolutePath}")
         }
@@ -179,16 +208,30 @@ class AntoraContentScanner {
         pagesDir.walkTopDown()
             .filter { it.isFile && it.extension == "adoc" }
             .map { adocFile ->
+                val content = adocFile.readText()
+                val refs = referenceExtractor.extract(content)
                 AntoraPage(
                     siteKey = siteKey,
                     componentName = descriptor.name,
                     componentVersion = descriptor.version,
                     moduleName = moduleName,
                     relativePath = adocFile.relativeTo(baseDir).path,
-                    sourceFile = adocFile
+                    sourceFile = adocFile,
+                    title = refs.title ?: "",
+                    images = refs.images,
+                    includes = refs.includes,
+                    xrefs = refs.xrefs
                 )
             }
             .toList()
+
+    private fun discoverImages(contentDir: File): Map<String, File> {
+        val manifest = mutableMapOf<String, File>()
+        contentDir.walkTopDown()
+            .filter { it.isFile && it.parentFile.name == "images" }
+            .forEach { manifest[it.name] = it }
+        return manifest
+    }
 }
 
 /** Lightweight representation of a parsed `antora.yml` file. */
