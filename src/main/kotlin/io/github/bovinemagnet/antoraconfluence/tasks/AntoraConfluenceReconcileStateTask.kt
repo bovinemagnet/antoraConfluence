@@ -70,19 +70,33 @@ abstract class AntoraConfluenceReconcileStateTask : DefaultTask() {
         val store = ContentFingerprintStore(storeFile)
         val existingCount = store.allEntries().size
 
-        // Query Confluence for pages in the space that carry the managed-page property
-        // (Full property-based reconciliation requires listing pages with the property filter,
-        //  which is a Confluence API v2 extension. For now, we log the current state and
-        //  report the intent. A full implementation would iterate space pages and read properties.)
-        logger.lifecycle(
-            "  Local state has $existingCount tracked page(s). " +
-                "Remote reconciliation queries are performed per-page when credentials are valid."
-        )
+        logger.lifecycle("  Local state has $existingCount tracked page(s).")
         logger.lifecycle("")
-        logger.lifecycle(
-            "Note: Full remote state reconciliation scans all managed pages in the space. " +
-                "Run `antoraConfluencePublish` after reconciliation to re-sync any missing entries."
-        )
+
+        // Query Confluence for managed pages
+        val managedPages = client.listManagedPages(space.id, "managed-by-antora-confluence")
+        logger.lifecycle("  Found ${managedPages.size} managed page(s) in Confluence")
+
+        var reconciledCount = 0
+        for (page in managedPages) {
+            val canonicalKey = client.getPageProperty(page.id, "antora-confluence-key") ?: continue
+            val fingerprint = client.getPageProperty(page.id, "antora-confluence-fingerprint") ?: ""
+            val sourcePath = client.getPageProperty(page.id, "antora-confluence-source")
+
+            store.putComposite(
+                pageId = canonicalKey,
+                contentHash = fingerprint,
+                compositeHash = fingerprint,
+                confluencePageId = page.id,
+                confluenceTitle = page.title,
+                sourcePath = sourcePath
+            )
+            reconciledCount++
+            logger.lifecycle("  Reconciled: $canonicalKey -> Confluence page ${page.id} (${page.title})")
+        }
+
+        logger.lifecycle("")
+        logger.lifecycle("Reconciliation complete. $reconciledCount page(s) reconciled.")
 
         // Save (persist) any updates
         store.save()
