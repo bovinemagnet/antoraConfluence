@@ -201,7 +201,7 @@ class PublishEngine {
         parentPageId: String?
     ): PublishResult =
         try {
-            val html = converter.convert(page.sourceFile)
+            val html = converter.renderToHtml(page.sourceFile)
             val created = client.createPage(spaceId, parentPageId, page.suggestedTitle, html)
             store.put(page.pageId, content, created.id, page.suggestedTitle)
             PublishResult(page.pageId, page.suggestedTitle, PublishAction.CREATE, created.id, null)
@@ -219,7 +219,7 @@ class PublishEngine {
         existing: ConfluencePage
     ): PublishResult =
         try {
-            val html = converter.convert(page.sourceFile)
+            val html = converter.renderToHtml(page.sourceFile)
             val currentVersion = existing.version?.number ?: 1
             val updated = client.updatePage(existing.id, page.suggestedTitle, html, currentVersion)
             store.put(page.pageId, content, updated.id, page.suggestedTitle)

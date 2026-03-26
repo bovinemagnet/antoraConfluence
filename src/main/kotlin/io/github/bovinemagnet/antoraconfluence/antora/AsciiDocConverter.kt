@@ -1,5 +1,7 @@
 package io.github.bovinemagnet.antoraconfluence.antora
 
+import io.github.bovinemagnet.antoraconfluence.confluence.ConfluenceStorageFormatConverter
+import io.github.bovinemagnet.antoraconfluence.engine.model.PageContext
 import org.asciidoctor.Asciidoctor
 import org.asciidoctor.Attributes
 import org.asciidoctor.Options
@@ -26,36 +28,76 @@ class AsciiDocConverter : AutoCloseable {
         }
 
     /**
-     * Converts the given [sourceFile] to an HTML string suitable for embedding in a Confluence
-     * storage-format page body.
+     * Renders the given [sourceFile] to an HTML string.
      *
      * @param sourceFile  Absolute path to the `.adoc` source file.
      * @param attributes  Optional map of additional Asciidoctor document attributes.
      * @return            Rendered HTML fragment (does not include html/body wrappers).
      */
-    fun convert(sourceFile: File, attributes: Map<String, String> = emptyMap()): String {
+    fun renderToHtml(sourceFile: File, attributes: Map<String, String> = emptyMap()): String {
+        val baseDir = sourceFile.parentFile
+        val extraAttributes = attributes.toMutableMap()
         val options = Options.builder()
             .safe(SafeMode.UNSAFE)
             .standalone(false)
-            .attributes(buildAttributes(attributes))
+            .baseDir(baseDir)
+            .attributes(buildAttributes(extraAttributes))
             .build()
         return asciidoctor.convertFile(sourceFile, options)
+            ?: asciidoctor.convert(sourceFile.readText(), options)
     }
 
     /**
-     * Converts the given [content] string (AsciiDoc markup) to an HTML string.
+     * Renders the given [content] string (AsciiDoc markup) to an HTML string.
      *
      * @param content     AsciiDoc markup as a string.
      * @param attributes  Optional map of additional Asciidoctor document attributes.
      * @return            Rendered HTML fragment.
      */
-    fun convertString(content: String, attributes: Map<String, String> = emptyMap()): String {
+    fun renderStringToHtml(content: String, attributes: Map<String, String> = emptyMap()): String {
         val options = Options.builder()
             .safe(SafeMode.UNSAFE)
             .standalone(false)
             .attributes(buildAttributes(attributes))
             .build()
         return asciidoctor.convert(content, options)
+    }
+
+    /**
+     * Renders the given [sourceFile] to Confluence storage format.
+     *
+     * Converts AsciiDoc to HTML first, then post-processes the HTML into
+     * Confluence storage format using [ConfluenceStorageFormatConverter].
+     *
+     * @param sourceFile  Absolute path to the `.adoc` source file.
+     * @param context     Page context for resolving xrefs and images.
+     * @param attributes  Optional map of additional Asciidoctor document attributes.
+     * @return            Confluence storage format XML fragment.
+     */
+    fun renderToConfluenceStorage(
+        sourceFile: File,
+        context: PageContext,
+        attributes: Map<String, String> = emptyMap()
+    ): String {
+        val html = renderToHtml(sourceFile, attributes)
+        return ConfluenceStorageFormatConverter().convert(html, context)
+    }
+
+    /**
+     * Renders the given AsciiDoc [content] string to Confluence storage format.
+     *
+     * @param content     AsciiDoc markup as a string.
+     * @param context     Page context for resolving xrefs and images.
+     * @param attributes  Optional map of additional Asciidoctor document attributes.
+     * @return            Confluence storage format XML fragment.
+     */
+    fun renderStringToConfluenceStorage(
+        content: String,
+        context: PageContext,
+        attributes: Map<String, String> = emptyMap()
+    ): String {
+        val html = renderStringToHtml(content, attributes)
+        return ConfluenceStorageFormatConverter().convert(html, context)
     }
 
     override fun close() {
