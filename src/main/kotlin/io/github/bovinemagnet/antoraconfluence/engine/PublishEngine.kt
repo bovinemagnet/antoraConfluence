@@ -14,6 +14,7 @@ import io.github.bovinemagnet.antoraconfluence.engine.model.PublishResult
 import io.github.bovinemagnet.antoraconfluence.engine.model.PublishSummary
 import io.github.bovinemagnet.antoraconfluence.fingerprint.ContentFingerprintStore
 import org.slf4j.LoggerFactory
+import java.io.File
 
 /**
  * Core publish engine that scans Antora content and publishes it to Confluence.
@@ -37,7 +38,9 @@ class PublishEngine {
      */
     fun publish(request: PublishRequest): PublishSummary {
         val scanner = AntoraContentScanner()
-        val pages = scanner.scan(request.contentDir, request.siteKey)
+        val contentModel = scanner.scanFull(request.contentDir, request.siteKey)
+        val pages = contentModel.pages
+        val imageManifest = contentModel.imageManifest
 
         if (pages.isEmpty()) {
             log.info("No Antora pages found in ${request.contentDir.absolutePath}. Nothing to publish.")
@@ -54,7 +57,7 @@ class PublishEngine {
         val results = if (request.dryRun) {
             computeDryRunResults(pages, store, request)
         } else {
-            executeLivePublish(pages, store, request)
+            executeLivePublish(pages, imageManifest, store, request)
         }
 
         val sourcePageIds = pages.map { it.pageId }.toSet()
@@ -137,6 +140,7 @@ class PublishEngine {
 
     private fun executeLivePublish(
         pages: List<AntoraPage>,
+        imageManifest: Map<String, File>,
         store: ContentFingerprintStore,
         request: PublishRequest
     ): List<PublishResult> {
@@ -157,9 +161,32 @@ class PublishEngine {
                 val result = publishPage(page, converter, client, store, space.id, resolvedParentId, request)
                 results.add(result)
                 logResult(result, request.dryRun)
+
+                if (request.uploadImages && result.confluencePageId != null) {
+                    uploadPageImages(page, imageManifest, result.confluencePageId, client)
+                }
             }
         }
         return results
+    }
+
+    private fun uploadPageImages(
+        page: AntoraPage,
+        imageManifest: Map<String, File>,
+        confluencePageId: String,
+        client: ConfluenceClient
+    ) {
+        val pageImages = page.images.mapNotNull { imgRef ->
+            val fileName = imgRef.substringAfterLast("/")
+            imageManifest[fileName]?.let { fileName to it }
+        }
+        for ((fileName, file) in pageImages) {
+            try {
+                client.uploadAttachment(confluencePageId, fileName, file, guessMimeType(fileName))
+            } catch (e: Exception) {
+                log.warn("Failed to upload image {} for page {}: {}", fileName, page.pageId, e.message)
+            }
+        }
     }
 
     private fun publishPage(
@@ -309,5 +336,18 @@ class PublishEngine {
             dryRun = request.dryRun,
             forceAll = request.forceAll
         )
+    }
+
+    // -------------------------------------------------------------------------
+    // MIME type helper
+    // -------------------------------------------------------------------------
+
+    private fun guessMimeType(fileName: String): String = when (fileName.substringAfterLast('.').lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
+        "svg" -> "image/svg+xml"
+        "webp" -> "image/webp"
+        else -> "application/octet-stream"
     }
 }

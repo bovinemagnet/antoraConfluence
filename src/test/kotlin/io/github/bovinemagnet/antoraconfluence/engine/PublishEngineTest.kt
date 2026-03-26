@@ -209,4 +209,23 @@ class PublishEngineTest {
         // forceAll bypasses fingerprint — should be UPDATE (existing fingerprint found)
         assertThat(summary.results.map { it.action }).doesNotContain(PublishAction.SKIP)
     }
+
+    // -------------------------------------------------------------------------
+    // Image handling
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `dry run handles content with image references`() {
+        val docsDir = File(tempDir, "docs").also { it.mkdirs() }
+        File(docsDir, "antora.yml").writeText("name: test-comp\nversion: '1.0'\n")
+        val pagesDir = File(docsDir, "modules/ROOT/pages").also { it.mkdirs() }
+        File(pagesDir, "index.adoc").writeText("= Index\n\nimage::logo.png[Logo]\n")
+        val imagesDir = File(docsDir, "modules/ROOT/images").also { it.mkdirs() }
+        File(imagesDir, "logo.png").writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47))
+
+        val request = buildDryRunRequest(contentDir = docsDir)
+        val summary = engine.publish(request)
+        assertThat(summary.results).isNotEmpty
+        assertThat(summary.results.first().action).isEqualTo(PublishAction.CREATE)
+    }
 }
