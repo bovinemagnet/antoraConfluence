@@ -24,7 +24,7 @@ dependencies {
 
     testImplementation(gradleTestKit())
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
-    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("com.squareup.okhttp3:mockwebserver:$okHttpVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
