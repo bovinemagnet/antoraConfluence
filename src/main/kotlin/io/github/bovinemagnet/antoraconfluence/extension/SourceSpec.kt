@@ -40,4 +40,7 @@ abstract class SourceSpec @Inject constructor() {
      * Use this when shared includes or partials live outside the main [antoraRoot].
      */
     abstract val includes: ConfigurableFileCollection
+
+    /** When true, antoraConfluenceValidate will depend on the `antora` task if the org.antora plugin is applied. */
+    abstract val dependsOnAntoraTask: Property<Boolean>
 }

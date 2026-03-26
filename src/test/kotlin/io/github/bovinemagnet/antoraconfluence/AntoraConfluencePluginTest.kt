@@ -277,6 +277,28 @@ class AntoraConfluencePluginTest {
     }
 
     // -------------------------------------------------------------------------
+    // Antora plugin integration
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `plugin works standalone without org antora plugin`() {
+        createValidAntoraContent()
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            antoraConfluence {
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                }
+            }
+        """)
+        val result = runner("antoraConfluenceValidate").build()
+        assertThat(result.task(":antoraConfluenceValidate")?.outcome)
+            .isEqualTo(org.gradle.testkit.runner.TaskOutcome.SUCCESS)
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 

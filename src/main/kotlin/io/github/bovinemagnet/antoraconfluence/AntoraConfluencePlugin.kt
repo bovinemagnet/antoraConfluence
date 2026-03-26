@@ -1,5 +1,6 @@
 package io.github.bovinemagnet.antoraconfluence
 
+import io.github.bovinemagnet.antoraconfluence.engine.AntoraPluginIntegration
 import io.github.bovinemagnet.antoraconfluence.extension.AntoraConfluenceExtension
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluenceFullPublishTask
 import io.github.bovinemagnet.antoraconfluence.tasks.AntoraConfluencePlanTask
@@ -54,6 +55,12 @@ class AntoraConfluencePlugin : Plugin<Project> {
         extension.reports.planReportFile.convention(
             project.layout.buildDirectory.file("antora-confluence/plan-report.json")
         )
+
+        // Set default for dependsOnAntoraTask
+        extension.source.dependsOnAntoraTask.convention(false)
+
+        // Optional Antora plugin integration
+        AntoraPluginIntegration().configure(project)
 
         // Register tasks (lazily)
         val credentialsPresentProvider = extension.confluence.username.zip(extension.confluence.apiToken) { u, t ->
