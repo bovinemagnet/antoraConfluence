@@ -147,4 +147,61 @@ class ContentFingerprintStoreTest {
         assertThat(store.allEntries()).hasSize(1)
         assertThat(store.allEntries().first().pageId).isEqualTo("x")
     }
+
+    // -------------------------------------------------------------------------
+    // putComposite() and isCompositeChanged()
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `putComposite stores all enhanced fields`() {
+        val store = ContentFingerprintStore(storeFile())
+        store.putComposite(
+            pageId = "test/page",
+            contentHash = "hash1",
+            compositeHash = "composite1",
+            confluencePageId = "123",
+            confluenceTitle = "Test Page",
+            parentKey = "test",
+            sourcePath = "docs/pages/test.adoc",
+            imageHashes = mapOf("logo.png" to "imghash"),
+            includeHashes = mapOf("header.adoc" to "inchash"),
+            pluginVersion = "0.1.0"
+        )
+        val entry = store.get("test/page")
+        assertThat(entry).isNotNull
+        assertThat(entry!!.compositeHash).isEqualTo("composite1")
+        assertThat(entry.parentKey).isEqualTo("test")
+        assertThat(entry.sourcePath).isEqualTo("docs/pages/test.adoc")
+        assertThat(entry.imageHashes).containsEntry("logo.png", "imghash")
+        assertThat(entry.includeHashes).containsEntry("header.adoc", "inchash")
+        assertThat(entry.pluginVersion).isEqualTo("0.1.0")
+    }
+
+    @Test
+    fun `isCompositeChanged returns true for new page`() {
+        val store = ContentFingerprintStore(storeFile())
+        assertThat(store.isCompositeChanged("new/page", "hash")).isTrue()
+    }
+
+    @Test
+    fun `isCompositeChanged returns false when hash matches`() {
+        val store = ContentFingerprintStore(storeFile())
+        store.putComposite("page", "raw", "composite1")
+        assertThat(store.isCompositeChanged("page", "composite1")).isFalse()
+    }
+
+    @Test
+    fun `putComposite persists and reloads correctly`() {
+        val file = storeFile()
+        val store1 = ContentFingerprintStore(file)
+        store1.putComposite("page", "raw", "comp", confluencePageId = "456", parentKey = "parent")
+        store1.save()
+
+        val store2 = ContentFingerprintStore(file)
+        val entry = store2.get("page")
+        assertThat(entry).isNotNull
+        assertThat(entry!!.compositeHash).isEqualTo("comp")
+        assertThat(entry.confluencePageId).isEqualTo("456")
+        assertThat(entry.parentKey).isEqualTo("parent")
+    }
 }

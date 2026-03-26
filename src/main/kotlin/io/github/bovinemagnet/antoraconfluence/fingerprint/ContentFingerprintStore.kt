@@ -74,6 +74,62 @@ class ContentFingerprintStore(private val storeFile: File) {
     }
 
     /**
+     * Records or updates the fingerprint for [pageId] with a composite hash that covers
+     * the page content plus all its dependencies (images, includes).
+     *
+     * @param pageId           Stable identity key.
+     * @param contentHash      SHA-256 hash of the raw page content.
+     * @param compositeHash    Hash covering content and all dependency hashes.
+     * @param confluencePageId Confluence numeric page ID, if the page exists in Confluence.
+     * @param confluenceTitle  The title used when the page was last published.
+     * @param parentKey        The Antora component/module key of the parent.
+     * @param sourcePath       Relative path to the source AsciiDoc file.
+     * @param imageHashes      Map of image path to SHA-256 hash.
+     * @param includeHashes    Map of include file path to SHA-256 hash.
+     * @param pluginVersion    Version of the plugin that last published this page.
+     */
+    fun putComposite(
+        pageId: String,
+        contentHash: String,
+        compositeHash: String,
+        confluencePageId: String? = null,
+        confluenceTitle: String? = null,
+        parentKey: String? = null,
+        sourcePath: String? = null,
+        imageHashes: Map<String, String> = emptyMap(),
+        includeHashes: Map<String, String> = emptyMap(),
+        pluginVersion: String? = null
+    ) {
+        entries[pageId] = FingerprintEntry(
+            pageId = pageId,
+            contentHash = contentHash,
+            compositeHash = compositeHash,
+            confluencePageId = confluencePageId,
+            confluenceTitle = confluenceTitle,
+            parentKey = parentKey,
+            sourcePath = sourcePath,
+            imageHashes = imageHashes,
+            includeHashes = includeHashes,
+            pluginVersion = pluginVersion,
+            lastPublishedAt = java.time.Instant.now().toString()
+        )
+    }
+
+    /**
+     * Returns `true` if the composite hash for [pageId] differs from the stored value,
+     * meaning the page or one of its dependencies has changed.
+     *
+     * A page that has never been published is considered changed.
+     *
+     * @param pageId        Stable identity key.
+     * @param compositeHash Current composite hash to compare against the stored value.
+     */
+    fun isCompositeChanged(pageId: String, compositeHash: String): Boolean {
+        val entry = entries[pageId] ?: return true
+        return entry.compositeHash != compositeHash
+    }
+
+    /**
      * Removes the fingerprint record for [pageId].
      * Subsequent calls to [isChanged] will return `true` for this page.
      */
@@ -132,15 +188,27 @@ class ContentFingerprintStore(private val storeFile: File) {
  *
  * @property pageId           Stable Antora page identity key.
  * @property contentHash      SHA-256 hex digest of the source AsciiDoc content.
+ * @property compositeHash    Hash covering content and all dependency hashes (images, includes).
  * @property confluencePageId Confluence numeric page ID assigned when the page was first created.
  * @property confluenceTitle  Title used when the page was last published to Confluence.
+ * @property parentKey        The Antora component/module key of the parent.
+ * @property sourcePath       Relative path to the source AsciiDoc file.
+ * @property imageHashes      Map of image path to SHA-256 hash.
+ * @property includeHashes    Map of include file path to SHA-256 hash.
+ * @property pluginVersion    Version of the plugin that last published this page.
  * @property lastPublishedAt  ISO-8601 timestamp of the last successful publish.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class FingerprintEntry(
     val pageId: String,
     val contentHash: String,
+    val compositeHash: String? = null,
     val confluencePageId: String? = null,
     val confluenceTitle: String? = null,
+    val parentKey: String? = null,
+    val sourcePath: String? = null,
+    val imageHashes: Map<String, String> = emptyMap(),
+    val includeHashes: Map<String, String> = emptyMap(),
+    val pluginVersion: String? = null,
     val lastPublishedAt: String? = null
 )
