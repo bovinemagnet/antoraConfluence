@@ -6,7 +6,6 @@ import io.github.bovinemagnet.antoraconfluence.OrphanStrategy
 import io.github.bovinemagnet.antoraconfluence.PublishStrategy
 import io.github.bovinemagnet.antoraconfluence.VersionMode
 import io.github.bovinemagnet.antoraconfluence.engine.PublishEngine
-import io.github.bovinemagnet.antoraconfluence.engine.model.PublishAction
 import io.github.bovinemagnet.antoraconfluence.engine.model.PublishRequest
 import io.github.bovinemagnet.antoraconfluence.engine.model.PublishSummary
 import org.gradle.api.DefaultTask
@@ -114,12 +113,6 @@ abstract class AntoraConfluencePublishTask : DefaultTask() {
 
         writeReport(summary)
         logSummary(summary)
-
-        if (strict.get() && summary.failed > 0) {
-            throw GradleException(
-                "${summary.failed} page(s) failed to publish and strict mode is enabled."
-            )
-        }
     }
 
     // -------------------------------------------------------------------------

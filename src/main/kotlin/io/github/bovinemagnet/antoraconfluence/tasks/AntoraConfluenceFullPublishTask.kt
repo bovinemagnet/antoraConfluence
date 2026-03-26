@@ -111,12 +111,6 @@ abstract class AntoraConfluenceFullPublishTask : DefaultTask() {
 
         writeReport(summary)
         logSummary(summary)
-
-        if (strict.get() && summary.failed > 0) {
-            throw GradleException(
-                "${summary.failed} page(s) failed to publish and strict mode is enabled."
-            )
-        }
     }
 
     // -------------------------------------------------------------------------
