@@ -15,12 +15,15 @@ repositories {
 val okHttpVersion = "4.12.0"
 val jacksonVersion = "2.17.2"
 val asciidoctorjVersion = "3.0.0"
+val jsoupVersion = "1.18.1"
 
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion")
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
     implementation("org.asciidoctor:asciidoctorj:$asciidoctorjVersion")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion")
+    implementation("org.jsoup:jsoup:$jsoupVersion")
 
     testImplementation(gradleTestKit())
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
