@@ -212,6 +212,28 @@ class AntoraConfluencePluginTest {
         assertThat(result.output).contains("baseUrl")
     }
 
+    @Test
+    fun `validate task warns when credentials are missing with confluenceUrl set`() {
+        createValidAntoraContent()
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            antoraConfluence {
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                }
+                confluence {
+                    baseUrl.set("https://example.atlassian.net/wiki")
+                    spaceKey.set("DOCS")
+                }
+            }
+        """)
+        val result = runner("antoraConfluenceValidate").build()
+        assertThat(result.output).contains("username")
+        assertThat(result.output).contains("apiToken")
+    }
+
     // -------------------------------------------------------------------------
     // antoraConfluencePlan task
     // -------------------------------------------------------------------------

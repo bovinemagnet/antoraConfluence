@@ -43,13 +43,15 @@ abstract class AntoraConfluencePlanTask : DefaultTask() {
     @get:Optional
     abstract val confluenceUrl: Property<String>
 
-    @get:Input
-    @get:Optional
+    @get:Internal
     abstract val username: Property<String>
+
+    @get:Internal
+    abstract val apiToken: Property<String>
 
     @get:Input
     @get:Optional
-    abstract val apiToken: Property<String>
+    abstract val credentialsPresent: Property<Boolean>
 
     @get:Input
     @get:Optional

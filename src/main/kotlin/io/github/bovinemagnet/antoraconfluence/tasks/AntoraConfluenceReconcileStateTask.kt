@@ -29,11 +29,14 @@ abstract class AntoraConfluenceReconcileStateTask : DefaultTask() {
     @get:Input
     abstract val confluenceUrl: Property<String>
 
-    @get:Input
+    @get:Internal
     abstract val username: Property<String>
 
-    @get:Input
+    @get:Internal
     abstract val apiToken: Property<String>
+
+    @get:Input
+    abstract val credentialsPresent: Property<Boolean>
 
     @get:Input
     abstract val spaceKey: Property<String>

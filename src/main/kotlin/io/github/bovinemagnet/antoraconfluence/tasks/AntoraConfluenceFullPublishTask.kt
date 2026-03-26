@@ -16,6 +16,7 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -46,11 +47,14 @@ abstract class AntoraConfluenceFullPublishTask : DefaultTask() {
     @get:Input
     abstract val confluenceUrl: Property<String>
 
-    @get:Input
+    @get:Internal
     abstract val username: Property<String>
 
-    @get:Input
+    @get:Internal
     abstract val apiToken: Property<String>
+
+    @get:Input
+    abstract val credentialsPresent: Property<Boolean>
 
     @get:Input
     abstract val spaceKey: Property<String>

@@ -56,6 +56,10 @@ class AntoraConfluencePlugin : Plugin<Project> {
         )
 
         // Register tasks (lazily)
+        val credentialsPresentProvider = extension.confluence.username.zip(extension.confluence.apiToken) { u, t ->
+            u.isNotBlank() && t.isNotBlank()
+        }.orElse(false)
+
         val validateTask = project.tasks.register(TASK_VALIDATE, AntoraConfluenceValidateTask::class.java)
         validateTask.configure {
             group = TASK_GROUP
@@ -63,6 +67,7 @@ class AntoraConfluencePlugin : Plugin<Project> {
             contentDir.set(extension.source.antoraRoot)
             confluenceUrl.set(extension.confluence.baseUrl)
             spaceKey.set(extension.confluence.spaceKey)
+            credentialsPresent.set(credentialsPresentProvider)
         }
 
         val planTask = project.tasks.register(TASK_PLAN, AntoraConfluencePlanTask::class.java)
@@ -76,6 +81,7 @@ class AntoraConfluencePlugin : Plugin<Project> {
             apiToken.set(extension.confluence.apiToken)
             spaceKey.set(extension.confluence.spaceKey)
             parentPageId.set(extension.confluence.parentPageId)
+            credentialsPresent.set(credentialsPresentProvider)
             fingerprintFile.set(extension.state.file)
             planReportFile.set(extension.reports.planReportFile)
             dependsOn(validateTask)
@@ -97,6 +103,7 @@ class AntoraConfluencePlugin : Plugin<Project> {
             strict.set(extension.publish.strict)
             applyLabels.set(extension.publish.applyLabels)
             dryRun.set(extension.publish.dryRun)
+            credentialsPresent.set(credentialsPresentProvider)
             fingerprintFile.set(extension.state.file)
             reportFile.set(extension.reports.jsonReportFile)
             dependsOn(validateTask)
@@ -116,6 +123,7 @@ class AntoraConfluencePlugin : Plugin<Project> {
             strict.set(extension.publish.strict)
             applyLabels.set(extension.publish.applyLabels)
             dryRun.set(extension.publish.dryRun)
+            credentialsPresent.set(credentialsPresentProvider)
             fingerprintFile.set(extension.state.file)
             reportFile.set(extension.reports.jsonReportFile)
             dependsOn(validateTask)
@@ -129,6 +137,7 @@ class AntoraConfluencePlugin : Plugin<Project> {
             username.set(extension.confluence.username)
             apiToken.set(extension.confluence.apiToken)
             spaceKey.set(extension.confluence.spaceKey)
+            credentialsPresent.set(credentialsPresentProvider)
             fingerprintFile.set(extension.state.file)
         }
 

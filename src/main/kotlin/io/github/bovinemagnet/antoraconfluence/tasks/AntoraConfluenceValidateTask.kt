@@ -34,6 +34,10 @@ abstract class AntoraConfluenceValidateTask : DefaultTask() {
     @get:Optional
     abstract val spaceKey: Property<String>
 
+    @get:Input
+    @get:Optional
+    abstract val credentialsPresent: Property<Boolean>
+
     @TaskAction
     fun validate() {
         val contentDirFile = contentDir.get().asFile
@@ -60,6 +64,11 @@ abstract class AntoraConfluenceValidateTask : DefaultTask() {
         }
         if (!spaceKey.isPresent || spaceKey.get().isBlank()) {
             logger.warn("antoraConfluence.confluence.spaceKey is not set. Tasks that call Confluence will fail.")
+        }
+        if (confluenceUrl.isPresent && confluenceUrl.get().isNotBlank()) {
+            if (!credentialsPresent.getOrElse(false)) {
+                logger.warn("WARNING: confluence.baseUrl is set but username and/or apiToken are missing.")
+            }
         }
 
         logger.lifecycle("Validation passed.")
