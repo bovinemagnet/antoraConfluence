@@ -9,6 +9,9 @@ build/
 *.iws
 .vscode/
 
+# Worktrees
+.worktrees/
+
 # OS files
 .DS_Store
 Thumbs.db
