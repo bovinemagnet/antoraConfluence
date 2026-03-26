@@ -59,3 +59,28 @@ data class PageBody(
     val representation: String = "storage",
     val value: String
 )
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ConfluenceAttachment(
+    val id: String,
+    val title: String,
+    val fileSize: Long? = null,
+    val mediaType: String? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ConfluenceAttachmentList(
+    val results: List<ConfluenceAttachment> = emptyList()
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class ConfluenceProperty(
+    val id: String? = null,
+    val key: String,
+    val value: String
+)
+
+data class LabelRequest(
+    val name: String,
+    val prefix: String = "global"
+)

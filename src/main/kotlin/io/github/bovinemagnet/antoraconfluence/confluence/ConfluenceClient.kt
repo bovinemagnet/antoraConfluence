@@ -2,20 +2,27 @@ package io.github.bovinemagnet.antoraconfluence.confluence
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluenceAttachment
+import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluenceAttachmentList
 import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluencePage
 import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluencePageList
+import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluenceProperty
 import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluenceSpace
 import io.github.bovinemagnet.antoraconfluence.confluence.model.ConfluenceSpaceList
 import io.github.bovinemagnet.antoraconfluence.confluence.model.CreatePageRequest
+import io.github.bovinemagnet.antoraconfluence.confluence.model.LabelRequest
 import io.github.bovinemagnet.antoraconfluence.confluence.model.PageBody
 import io.github.bovinemagnet.antoraconfluence.confluence.model.UpdatePageRequest
 import io.github.bovinemagnet.antoraconfluence.confluence.model.VersionRequest
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -158,6 +165,142 @@ class ConfluenceClient(
             .header("Accept", "application/json")
             .build()
         return executeAndParse(httpRequest)
+    }
+
+    // -------------------------------------------------------------------------
+    // Label operations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adds labels to a Confluence page.
+     *
+     * @param pageId Numeric Confluence page ID.
+     * @param labels List of label names to add.
+     */
+    fun addLabels(pageId: String, labels: List<String>) {
+        val labelRequests = labels.map { LabelRequest(name = it) }
+        val body = json.writeValueAsString(labelRequests).toRequestBody(mediaTypeJson)
+        val httpRequest = Request.Builder()
+            .url("${apiBase()}/pages/$pageId/labels")
+            .post(body)
+            .header("Authorization", credentials)
+            .header("Accept", "application/json")
+            .build()
+        val response: Response = client.newCall(httpRequest).execute()
+        response.use {
+            if (!it.isSuccessful) {
+                val errorBody = it.body?.string() ?: "(no body)"
+                throw ConfluenceApiException(
+                    "Confluence API error ${it.code} for ${httpRequest.url}: $errorBody"
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Page property operations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Sets a page property (creates or overwrites).
+     *
+     * @param pageId Numeric Confluence page ID.
+     * @param key    Property key.
+     * @param value  Property value (stored as a JSON string).
+     */
+    fun setPageProperty(pageId: String, key: String, value: String) {
+        val property = ConfluenceProperty(key = key, value = value)
+        val body = json.writeValueAsString(property).toRequestBody(mediaTypeJson)
+        val httpRequest = Request.Builder()
+            .url("${apiBase()}/pages/$pageId/properties")
+            .post(body)
+            .header("Authorization", credentials)
+            .header("Accept", "application/json")
+            .build()
+        val response: Response = client.newCall(httpRequest).execute()
+        response.use {
+            if (!it.isSuccessful) {
+                val errorBody = it.body?.string() ?: "(no body)"
+                throw ConfluenceApiException(
+                    "Confluence API error ${it.code} for ${httpRequest.url}: $errorBody"
+                )
+            }
+        }
+    }
+
+    /**
+     * Retrieves a page property value by key.
+     *
+     * @param pageId Numeric Confluence page ID.
+     * @param key    Property key to look up.
+     * @return The property value string, or `null` if not found.
+     */
+    fun getPageProperty(pageId: String, key: String): String? {
+        val url = "${apiBase()}/pages/$pageId/properties/$key"
+        return try {
+            val property: ConfluenceProperty = get(url)
+            property.value
+        } catch (e: ConfluenceNotFoundException) {
+            null
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Attachment operations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Uploads a file as an attachment to a Confluence page.
+     *
+     * @param pageId   Numeric Confluence page ID.
+     * @param fileName Desired file name for the attachment.
+     * @param file     The file to upload.
+     * @param mimeType MIME type of the file.
+     * @return The attachment ID.
+     */
+    fun uploadAttachment(pageId: String, fileName: String, file: File, mimeType: String): String {
+        val fileBody = file.asRequestBody(mimeType.toMediaType())
+        val multipartBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", fileName, fileBody)
+            .build()
+        val httpRequest = Request.Builder()
+            .url("${apiBase()}/pages/$pageId/attachments")
+            .post(multipartBody)
+            .header("Authorization", credentials)
+            .header("Accept", "application/json")
+            .build()
+        val attachment: ConfluenceAttachment = executeAndParse(httpRequest)
+        return attachment.id
+    }
+
+    /**
+     * Lists all attachments on a Confluence page.
+     *
+     * @param pageId Numeric Confluence page ID.
+     * @return List of [ConfluenceAttachment] objects.
+     */
+    fun getAttachments(pageId: String): List<ConfluenceAttachment> {
+        val url = "${apiBase()}/pages/$pageId/attachments"
+        val list: ConfluenceAttachmentList = get(url)
+        return list.results
+    }
+
+    // -------------------------------------------------------------------------
+    // Managed page listing
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lists pages in a space that carry a specific label.
+     *
+     * @param spaceId Numeric Confluence space ID.
+     * @param label   Label to filter by.
+     * @return List of matching [ConfluencePage] objects (up to 250).
+     */
+    fun listManagedPages(spaceId: String, label: String): List<ConfluencePage> {
+        val url = "${apiBase()}/pages?space-id=$spaceId&label=$label&limit=250"
+        val list: ConfluencePageList = get(url)
+        return list.results
     }
 
     // -------------------------------------------------------------------------
