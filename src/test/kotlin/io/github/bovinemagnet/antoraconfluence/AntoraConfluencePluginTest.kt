@@ -281,6 +281,26 @@ class AntoraConfluencePluginTest {
     // -------------------------------------------------------------------------
 
     @Test
+    fun `plan task shows hierarchy-aware page structure`() {
+        createValidAntoraContent()
+        writeBuildFile("""
+            plugins {
+                id("io.github.bovinemagnet.antora-confluence")
+            }
+            antoraConfluence {
+                source {
+                    antoraRoot.set(layout.projectDirectory.dir("docs"))
+                    siteKey.set("test-site")
+                }
+            }
+        """)
+        val result = runner("antoraConfluencePlan").build()
+        assertThat(result.task(":antoraConfluencePlan")?.outcome)
+            .isEqualTo(org.gradle.testkit.runner.TaskOutcome.SUCCESS)
+        assertThat(result.output).contains("test-site/test-docs")
+    }
+
+    @Test
     fun `plugin works standalone without org antora plugin`() {
         createValidAntoraContent()
         writeBuildFile("""

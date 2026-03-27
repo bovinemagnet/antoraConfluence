@@ -73,6 +73,24 @@ abstract class AntoraConfluenceFullPublishTask : DefaultTask() {
     @get:Input
     abstract val dryRun: Property<Boolean>
 
+    @get:Input
+    abstract val hierarchyMode: Property<HierarchyMode>
+
+    @get:Input
+    abstract val versionMode: Property<VersionMode>
+
+    @get:Input
+    abstract val createIndexPages: Property<Boolean>
+
+    @get:Input
+    abstract val uploadImages: Property<Boolean>
+
+    @get:Input
+    abstract val normalizeWhitespaceForDiff: Property<Boolean>
+
+    @get:Input
+    abstract val failOnUnresolvedXref: Property<Boolean>
+
     @get:OutputFile
     abstract val fingerprintFile: RegularFileProperty
 
@@ -93,16 +111,16 @@ abstract class AntoraConfluenceFullPublishTask : DefaultTask() {
             parentPageId = parentPageId.orNull,
             publishStrategy = PublishStrategy.CREATE_AND_UPDATE,
             orphanStrategy = OrphanStrategy.REPORT,
-            hierarchyMode = HierarchyMode.COMPONENT_VERSION_MODULE_PAGE,
-            versionMode = VersionMode.HIERARCHY,
-            createIndexPages = false,
+            hierarchyMode = hierarchyMode.get(),
+            versionMode = versionMode.get(),
+            createIndexPages = createIndexPages.get(),
             strict = strict.get(),
             applyLabels = applyLabels.getOrElse(emptyList()),
             dryRun = dryRun.get(),
             forceAll = true,
-            uploadImages = true,
-            normalizeWhitespaceForDiff = true,
-            failOnUnresolvedXref = false,
+            uploadImages = uploadImages.get(),
+            normalizeWhitespaceForDiff = normalizeWhitespaceForDiff.get(),
+            failOnUnresolvedXref = failOnUnresolvedXref.get(),
             stateFile = fingerprintFile.get().asFile,
             reportFile = reportFile.get().asFile
         )
