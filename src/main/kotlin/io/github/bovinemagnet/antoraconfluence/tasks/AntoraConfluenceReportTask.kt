@@ -7,6 +7,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * Reports on the current Confluence publish state by reading the local fingerprint store and
@@ -14,6 +15,7 @@ import org.gradle.api.tasks.TaskAction
  *
  * This task is read-only and makes no API calls or filesystem writes.
  */
+@DisableCachingByDefault(because = "Reads local state files")
 abstract class AntoraConfluenceReportTask : DefaultTask() {
 
     @get:Internal

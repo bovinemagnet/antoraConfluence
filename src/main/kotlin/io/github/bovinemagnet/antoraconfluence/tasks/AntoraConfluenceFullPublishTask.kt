@@ -22,6 +22,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 import java.time.Instant
 
 /**
@@ -34,6 +35,7 @@ import java.time.Instant
  *
  * When [dryRun] is `true` the task logs all planned actions but makes no mutating API calls.
  */
+@DisableCachingByDefault(because = "Interacts with remote Confluence API")
 abstract class AntoraConfluenceFullPublishTask : DefaultTask() {
 
     @get:InputDirectory

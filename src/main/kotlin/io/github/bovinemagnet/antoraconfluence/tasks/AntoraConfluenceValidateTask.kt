@@ -12,6 +12,7 @@ import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * Validates the Antora content directory structure and required Confluence configuration values.
@@ -20,6 +21,7 @@ import org.gradle.api.tasks.TaskAction
  * It does **not** make any network calls; it only inspects the local filesystem and the extension
  * properties that have been set.
  */
+@DisableCachingByDefault(because = "Validates local content structure")
 abstract class AntoraConfluenceValidateTask : DefaultTask() {
 
     @get:InputDirectory

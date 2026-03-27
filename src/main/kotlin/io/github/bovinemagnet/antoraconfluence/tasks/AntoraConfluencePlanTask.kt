@@ -16,6 +16,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 import java.time.Instant
 
 /**
@@ -29,6 +30,7 @@ import java.time.Instant
  *
  * The plan is also written to [planReportFile] in JSON format.
  */
+@DisableCachingByDefault(because = "Interacts with remote Confluence API")
 abstract class AntoraConfluencePlanTask : DefaultTask() {
 
     @get:InputDirectory

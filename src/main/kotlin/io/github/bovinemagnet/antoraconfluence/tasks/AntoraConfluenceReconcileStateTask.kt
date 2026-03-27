@@ -10,6 +10,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * Rebuilds (reconciles) the local state file by querying Confluence page properties.
@@ -24,6 +25,7 @@ import org.gradle.api.tasks.TaskAction
  *
  * **This task makes only read-only Confluence API calls.**
  */
+@DisableCachingByDefault(because = "Interacts with remote Confluence API")
 abstract class AntoraConfluenceReconcileStateTask : DefaultTask() {
 
     @get:Input
